@@ -1,29 +1,200 @@
-<!DOCTYPE html>
+from pathlib import Path
+
+html = r'''<!doctype html>
 <html lang="ru">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Привет!</title>
-
-    <style>
-        body {
-            margin: 0;
-            height: 100vh;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            background: #111827;
-            font-family: Arial, sans-serif;
-        }
-
-        h1 {
-            color: white;
-            font-size: 80px;
-        }
-    </style>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>100 дней в подземелье</title>
+<style>
+:root{--bg:#0b0d12;--panel:#141923;--panel2:#1b2230;--text:#eef2f7;--muted:#9ba7b7;--accent:#c9a227;--danger:#d95757;--good:#5fcf8a}
+*{box-sizing:border-box}body{margin:0;background:radial-gradient(circle at top,#20283a 0,#0b0d12 55%);color:var(--text);font:15px system-ui,-apple-system,Segoe UI,sans-serif;min-height:100vh}
+button{border:0;border-radius:10px;padding:10px 14px;background:var(--accent);color:#17130a;font-weight:800;cursor:pointer}button:hover{filter:brightness(1.1)}button:disabled{opacity:.4;cursor:not-allowed}
+.wrap{max-width:1100px;margin:auto;padding:24px}.hero{display:flex;justify-content:space-between;gap:20px;align-items:end;margin-bottom:18px}.hero h1{font-size:34px;margin:0 0 4px}.hero p{margin:0;color:var(--muted)}
+.grid{display:grid;grid-template-columns:1.15fr .85fr;gap:16px}.panel{background:rgba(20,25,35,.94);border:1px solid #2b3444;border-radius:16px;padding:18px;box-shadow:0 12px 40px #0005}.full{grid-column:1/-1}
+.stats{display:grid;grid-template-columns:repeat(4,1fr);gap:10px}.stat{background:var(--panel2);padding:12px;border-radius:12px}.stat small{display:block;color:var(--muted)}.stat b{font-size:21px}
+.bar{height:9px;background:#090c11;border-radius:20px;overflow:hidden;margin-top:7px}.bar i{display:block;height:100%;background:var(--good);width:100%;transition:.25s}.bar.enemy i{background:var(--danger)}
+.class-list,.actions,.zones{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}.card{background:#18202c;border:1px solid #303b4d;border-radius:12px;padding:13px;cursor:pointer}.card.selected{border-color:var(--accent);box-shadow:0 0 0 1px var(--accent)}.card h3{margin:0 0 5px}.card p{margin:4px 0;color:var(--muted);font-size:13px}
+.actions{grid-template-columns:repeat(2,1fr);margin-top:12px}.actions button{width:100%}.log{height:230px;overflow:auto;background:#090c11;border-radius:12px;padding:12px;font-family:ui-monospace,monospace;font-size:13px}.log div{margin-bottom:6px}
+.item{display:flex;justify-content:space-between;gap:10px;padding:9px 0;border-bottom:1px solid #293140}.item:last-child{border-bottom:0}.tag{color:var(--accent)}
+#game{display:none}.notice{padding:12px;border-radius:10px;background:#201c0f;color:#e7d68b;margin-bottom:12px}
+table{width:100%;border-collapse:collapse}td,th{text-align:left;padding:9px;border-bottom:1px solid #293140}th{color:var(--muted)}
+@media(max-width:800px){.grid{grid-template-columns:1fr}.full{grid-column:auto}.stats{grid-template-columns:repeat(2,1fr)}.class-list,.zones{grid-template-columns:1fr}.hero{display:block}.hero button{margin-top:12px}}
+</style>
 </head>
-
 <body>
-    <h1>Привет 👋</h1>
+<div class="wrap">
+  <div class="hero">
+    <div><h1>⚔️ 100 дней в подземелье</h1><p>Мини-RPG: выживи, усиливайся и доберись до глубин.</p></div>
+    <button onclick="resetGame()">Новая игра</button>
+  </div>
+
+  <section id="start" class="panel">
+    <h2>Выбери класс</h2>
+    <div class="class-list">
+      <div class="card" onclick="chooseClass('warrior',this)"><h3>🛡️ Воин</h3><p>Много здоровья и сильные удары.</p><b>HP 130 · ATK 15 · DEF 7</b></div>
+      <div class="card" onclick="chooseClass('rogue',this)"><h3>🗡️ Разбойник</h3><p>Быстрый, высокий шанс критического удара.</p><b>HP 95 · ATK 19 · DEF 4</b></div>
+      <div class="card" onclick="chooseClass('mage',this)"><h3>🔮 Маг</h3><p>Мало HP, зато мощная магия.</p><b>HP 85 · ATK 24 · DEF 2</b></div>
+    </div>
+    <div id="startInfo" class="notice" style="margin-top:14px">Выбери класс, чтобы начать путешествие.</div>
+    <button id="startBtn" disabled onclick="startGame()">Начать день 1</button>
+  </section>
+
+  <section id="game">
+    <div class="grid">
+      <div class="panel">
+        <h2 id="zoneTitle">Зона</h2>
+        <div class="stats">
+          <div class="stat"><small>День</small><b id="day">1</b>/100</div>
+          <div class="stat"><small>Уровень</small><b id="level">1</b></div>
+          <div class="stat"><small>Золото</small><b id="gold">0</b> 🪙</div>
+          <div class="stat"><small>Рейтинг</small><b id="score">0</b></div>
+        </div>
+        <hr style="border-color:#293140;border-width:1px 0 0;margin:16px 0">
+        <h3 id="playerName">Герой</h3>
+        <div>❤️ <span id="hp"></span>/<span id="maxhp"></span></div><div class="bar"><i id="hpBar"></i></div>
+        <div style="margin-top:10px">👹 <span id="enemyName">—</span> <span id="enemyHpText"></span></div>
+        <div class="bar enemy"><i id="enemyBar"></i></div>
+        <div class="actions">
+          <button onclick="attack()">⚔️ Атаковать</button>
+          <button onclick="potion()">🧪 Выпить зелье</button>
+          <button onclick="rest()">🔥 Отдохнуть</button>
+          <button onclick="nextDay()">🚪 Следующий день</button>
+        </div>
+        <p style="color:var(--muted);font-size:12px">Победа над монстром даёт XP и золото. Отдых восстанавливает часть HP, но не продвигает день.</p>
+      </div>
+
+      <div class="panel">
+        <h2>🎒 Инвентарь</h2>
+        <div id="inventory"></div>
+        <hr style="border-color:#293140;border-width:1px 0 0;margin:14px 0">
+        <h3>Характеристики</h3>
+        <div class="item"><span>⚔️ Атака</span><b id="atk"></b></div>
+        <div class="item"><span>🛡️ Защита</span><b id="def"></b></div>
+        <div class="item"><span>💥 Крит</span><b id="crit"></b>%</div>
+        <div class="item"><span>⭐ XP</span><b id="xp"></b>/<span id="nextXp"></span></div>
+        <button style="width:100%;margin-top:12px" onclick="upgrade()">⬆️ Улучшить случайный параметр (50 🪙)</button>
+      </div>
+
+      <div class="panel full">
+        <h2>🗺️ Зоны</h2>
+        <div class="zones">
+          <div class="card"><h3>🌲 Заброшенный лес</h3><p>Дни 1–20 · Слабые монстры</p></div>
+          <div class="card"><h3>⛏️ Шахты</h3><p>Дни 21–50 · Больше золота</p></div>
+          <div class="card"><h3>🔥 Лавовые глубины</h3><p>Дни 51–80 · Опасные враги</p></div>
+          <div class="card"><h3>💀 Цитадель</h3><p>Дни 81–99 · Элитные враги</p></div>
+          <div class="card"><h3>👑 Сердце подземелья</h3><p>День 100 · Финальный босс</p></div>
+        </div>
+      </div>
+
+      <div class="panel">
+        <h2>📜 Журнал</h2><div id="log" class="log"></div>
+      </div>
+      <div class="panel">
+        <h2>🏆 Глобальный рейтинг</h2>
+        <table><thead><tr><th>#</th><th>Герой</th><th>Дни</th><th>Очки</th></tr></thead>
+        <tbody id="leaderboard"></tbody></table>
+      </div>
+    </div>
+  </section>
+</div>
+
+<script>
+const classes={
+ warrior:{name:'Артур',cls:'Воин',hp:130,atk:15,def:7,crit:10},
+ rogue:{name:'Нокс',cls:'Разбойник',hp:95,atk:19,def:4,crit:25},
+ mage:{name:'Элара',cls:'Маг',hp:85,atk:24,def:2,crit:15}
+};
+let p=null, enemy=null, selected=null;
+
+function chooseClass(k,el){
+ selected=k; document.querySelectorAll('.class-list .card').forEach(x=>x.classList.remove('selected')); el.classList.add('selected');
+ const c=classes[k]; document.getElementById('startInfo').textContent=`${c.name} готов к походу. Его задача — пережить 100 дней.`;
+ document.getElementById('startBtn').disabled=false;
+}
+function startGame(){
+ const c=classes[selected];
+ p={...c,level:1,xp:0,gold:40,day:1,score:0,potions:2,items:[],alive:true};
+ document.getElementById('start').style.display='none'; document.getElementById('game').style.display='block';
+ log(`Начало похода. ${p.name}, ${p.cls}, спускается в подземелье.`);
+ spawn(); render();
+}
+function zone(){
+ if(p.day<=20)return ['🌲 Заброшенный лес',['Гоблин','Волк','Плесневик']];
+ if(p.day<=50)return ['⛏️ Шахты',['Кобольд','Пещерный паук','Каменный голем']];
+ if(p.day<=80)return ['🔥 Лавовые глубины',['Огненный бес','Магма-змей','Демон']];
+ if(p.day<100)return ['💀 Цитадель',['Рыцарь смерти','Лич','Осквернённый страж']];
+ return ['👑 Сердце подземелья',['👑 Повелитель подземелья']];
+}
+function spawn(){
+ const z=zone(), name=z[1][Math.floor(Math.random()*z[1].length)];
+ let mult=1+p.day*.025, boss=p.day===100;
+ enemy={name,hp:Math.floor((boss?300:45+Math.random()*35)*mult),maxhp:0,atk:Math.floor((boss?28:8+p.day*.18)*mult),gold:boss?500:Math.floor(10+p.day*.7),xp:boss?250:Math.floor(12+p.day*.5)};
+ enemy.maxhp=enemy.hp;
+ log(`Появился враг: ${enemy.name}.`);
+}
+function attack(){
+ if(!p?.alive||!enemy)return;
+ let crit=Math.random()*100<p.crit, dmg=Math.max(1,Math.floor(p.atk*(.8+Math.random()*.45))-(Math.floor(enemy.atk*.18)));
+ if(crit)dmg*=2;
+ enemy.hp-=dmg; log(`⚔️ ${p.name} наносит ${dmg}${crit?' КРИТ!':''} урона.`);
+ if(enemy.hp<=0){win();return}
+ enemyTurn(); render();
+}
+function enemyTurn(){
+ let dmg=Math.max(1,enemy.atk-p.def-Math.floor(Math.random()*4));
+ p.hp-=dmg; log(`👹 ${enemy.name} наносит ${dmg} урона.`);
+ if(p.hp<=0){p.hp=0;p.alive=false;log('☠️ Герой пал. Поход окончен.');}
+}
+function win(){
+ p.gold+=enemy.gold;p.xp+=enemy.xp;p.score+=enemy.xp*2+p.day*3;
+ log(`🏆 Победа! +${enemy.xp} XP, +${enemy.gold} 🪙.`);
+ if(Math.random()<.28){p.potions++;log('🧪 Найдено зелье.');}
+ while(p.xp>=p.level*60){p.xp-=p.level*60;p.level++;p.maxhp=p.hp=Math.floor(p.hp+18);p.atk+=3;p.def+=1;log(`✨ Новый уровень: ${p.level}!`);}
+ enemy=null; render();
+}
+function potion(){
+ if(!p?.alive||p.potions<=0||p.hp>=p.maxhp)return;
+ p.potions--;let heal=Math.min(p.maxhp-p.hp,35+p.level*5);p.hp+=heal;log(`🧪 Восстановлено ${heal} HP.`);enemyTurn();render();
+}
+function rest(){
+ if(!p?.alive||!enemy)return;
+ let heal=Math.min(p.maxhp-p.hp,Math.floor(p.maxhp*.2));p.hp+=heal;log(`🔥 Отдых: +${heal} HP.`);enemyTurn();render();
+}
+function nextDay(){
+ if(!p?.alive)return;
+ if(enemy){log('⚠️ Сначала победи текущего врага.');return}
+ if(p.day>=100){finish();return}
+ p.day++;p.hp=Math.min(p.maxhp,p.hp+Math.floor(p.maxhp*.12));spawn();render();
+}
+function upgrade(){
+ if(!p?.alive||p.gold<50)return log('💰 Нужно 50 золота.');
+ p.gold-=50;let r=Math.floor(Math.random()*3);
+ if(r===0){p.atk+=4;log('⬆️ Атака +4.')}else if(r===1){p.def+=2;log('⬆️ Защита +2.')}else{p.maxhp+=15;p.hp+=15;log('⬆️ Максимальное HP +15.')}
+ render();
+}
+function finish(){
+ p.score+=1000;log('👑 Ты достиг Сердца подземелья и завершил 100 дней!');
+ alert(`Победа! ${p.name} пережил 100 дней. Очки: ${p.score}`);
+}
+function log(t){const x=document.getElementById('log');x.innerHTML+=`<div>${t}</div>`;x.scrollTop=x.scrollHeight}
+function render(){
+ if(!p)return;
+ const z=zone();document.getElementById('zoneTitle').textContent=z[0];
+ for(const id of ['day','level','gold','score','hp','maxhp','atk','def','crit','xp','nextXp'])document.getElementById(id).textContent=id==='nextXp'?p.level*60:p[id];
+ document.getElementById('playerName').textContent=`${p.name} — ${p.cls}`;
+ document.getElementById('hpBar').style.width=(p.hp/p.maxhp*100)+'%';
+ document.getElementById('enemyName').textContent=enemy?enemy.name:'—';
+ document.getElementById('enemyHpText').textContent=enemy?`${enemy.hp}/${enemy.maxhp}`:'';
+ document.getElementById('enemyBar').style.width=enemy?(enemy.hp/enemy.maxhp*100)+'%':'0%';
+ document.getElementById('inventory').innerHTML=`<div class="item"><span>🧪 Зелья</span><b>${p.potions}</b></div>`+(p.items.length?p.items.map(i=>`<div class="item"><span>${i}</span></div>`).join(''):'<div style="color:var(--muted)">Пока пусто</div>');
+ document.getElementById('leaderboard').innerHTML=[['1','Безымянный','100','12 840'],['2','Тень','94','10 210'],['3','Грим','87','9 440'],['4',p.name,p.day,p.score]].map(r=>`<tr>${r.map(x=>`<td>${x}</td>`).join('')}</tr>`).join('');
+}
+function resetGame(){location.reload()}
+</script>
 </body>
-</html>
+</html>'''
+
+path = Path("/mnt/data/100_days_dungeon.html")
+path.write_text(html, encoding="utf-8")
+print(path)
